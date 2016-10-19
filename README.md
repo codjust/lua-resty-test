@@ -16,10 +16,7 @@ Note that at least ngx_lua 0.5.14 or ngx_openresty 1.2.1.14 is required.
  # you do not need the following line if you are using
     # the ngx_openresty bundle:
     lua_package_path "/path/to/lua-resty-redis/lib/?.lua;;";
-
-    # A lua_shared_dict named cache_ngx is required by test:bench_run
-    lua_shared_dict cache_ngx 100k;
-
+    
     server {
 
         listen 8080;
@@ -31,13 +28,14 @@ Note that at least ngx_lua 0.5.14 or ngx_openresty 1.2.1.14 is required.
         location /test {
             content_by_lua '
                 	local iresty_test    = require "resty.iresty_test"
-					local tb = iresty_test.new({unit_name="bench_example"})
-
+					local tb = iresty_test.new({unit_name="test_example"})
 
 					function tb:init(  )
 					    self:log("init complete")
 					end
-
+					function tb:destroy()
+					    self:log("destroy complete")
+					end
 					function tb:test_00001(  )
 					    error("invalid input")
 					end
@@ -51,10 +49,7 @@ Note that at least ngx_lua 0.5.14 or ngx_openresty 1.2.1.14 is required.
 					end
 
 					-- units test
-					tb:run()
-
-					-- bench units test
-					tb:bench_run()
+					tb:run()				
             ';
         }
     }
@@ -69,17 +64,15 @@ curl "http://127.0.0.1:8080/test"
 The output result:
 
 ```shell
-0.000  [bench_example] unit test start
-0.000  [bench_example] init complete
-0.000    \_[test_00001] fail ...de/nginx/main_server/test_case_lua/unit/test_example.lua:9: invalid input
-0.000    \_[test_00003] ↓ ok
-0.000    \_[test_00003] PASS
-0.000  [bench_example] unit test complete
-0.000  [bench_example] !!!BENCH TEST START!!
-0.484  [bench_example] succ count:	 100001	QPS:	 206613.65
-0.484  [bench_example] fail count:	 100001 	QPS:	 206613.65
-0.484  [bench_example] loop count:	 100000 	QPS:	 206611.58
-0.484  [bench_example] !!!BENCH TEST ALL DONE!!!
+0.000 [test_example] unit test start 
+0.000 [test_example] init complete
+0.000   \_[test_00001] fail content_by_lua(nginx.conf:55):11: invalid input 
+0.000 [test_example] destroy complete
+0.000 [test_example] init complete
+0.000   \_[test_00003] ok
+0.000   \_[test_00003] PASS 
+0.000 [test_example] destroy complete
+0.000 [test_example] unit test complete 
 ```
 
 #Author
