@@ -12,47 +12,50 @@ Note that at least ngx_lua 0.5.14 or ngx_openresty 1.2.1.14 is required.
 #Synopsis
 
 
+
 ```nginx
- # you do not need the following line if you are using
-    # the ngx_openresty bundle:
-    lua_package_path "/path/to/lua-resty-redis/lib/?.lua;;";
+# you do not need the following line if you are using
+# the ngx_openresty bundle:
+lua_package_path "/path/to/lua-resty-redis/lib/?.lua;;";
     
-    server {
+server {
 
-        listen 8080;
+    listen 8080;
 
-        server_name 127.0.0.1;
+    server_name 127.0.0.1;
 
-        error_log /path/to/error.log;
+    error_log /path/to/error.log;
 
-        location /test {
-            content_by_lua '
-                	local iresty_test    = require "resty.iresty_test"
-					local tb = iresty_test.new({unit_name="test_example"})
+    location /test {
+        content_by_lua_block {
+            local iresty_test = require "resty.iresty_test"
+			local tb = iresty_test.new({unit_name = "test_example"})
 
-					function tb:init(  )
-					    self:log("init complete")
-					end
-					function tb:destroy()
-					    self:log("destroy complete")
-					end
-					function tb:test_00001(  )
-					    error("invalid input")
-					end
+			function tb:init()
+				self:log("init complete")
+			end
+				
+			function tb:destroy()
+				self:log("destroy complete")
+			end
+				
+			function tb:test_00001()
+				error("invalid input")
+			end
 
-					function tb:atest_00002()
-					    self:log("never be called")
-					end
+			function tb:atest_00002()
+				self:log("never be called")
+			end
 
-					function tb:test_00003(  )
-					   self:log("ok")
-					end
+			function tb:test_00003()
+				self:log("ok")
+			end
 
-					-- units test
-					tb:run()				
-            ';
+			-- units test
+			tb:run()				
         }
     }
+}
 ```
 
 Run test case:
@@ -73,6 +76,67 @@ The output result:
 0.000   \_[test_00003] PASS 
 0.000 [test_example] destroy complete
 0.000 [test_example] unit test complete 
+```
+#mock Example
+lua-resty-test provides a mock_run method to users testing.We always need to test whether the interface can be properly handled when the function returns an error.And mock_run method can help us solve this problem.
+
+see example:
+
+nginx.conf:
+```nginx
+# you do not need the following line if you are using
+# the ngx_openresty bundle:
+lua_package_path "/path/to/lua-resty-redis/lib/?.lua;;";
+
+server {
+
+    listen 8080;
+
+    server_name 127.0.0.1;
+
+    error_log /path/to/error.log;
+
+    # use mock_run
+    location /test_mock {
+        content_by_lua_block {
+            local iresty_test = require "resty.iresty_test"
+            local tb = iresty_test.new({unit_name = "mock_example"})
+            local M  = {}
+            function M.test()
+                return "Hello World"
+            end
+
+            function tb:test_001()
+                local function _test()
+                    return "test func error"
+                end
+                    
+                local mockrules = {
+                    { M, "test", _test }
+                }
+
+                local function _test_run()
+                    self:log(M.test())
+                end
+
+                self:mock_run(mockrules, _test_run)
+            end
+
+            tb:run()
+        }
+    }
+}
+```
+Run test case:
+```
+curl '127.0.0.1:8080/test_mock'
+```
+The output result:
+```shell
+0.000 [mock_example] unit test start 
+0.000   \_[test_001] test func error
+0.000   \_[test_001] PASS 
+0.000 [mock_example] unit test complete 
 ```
 
 #Author
