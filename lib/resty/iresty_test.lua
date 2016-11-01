@@ -1,5 +1,3 @@
--- Copyright (C) YuanSheng Wang (membphis), 360 Inc.
-
 local lock = require "resty.lock"
 
 local _M = {
@@ -17,7 +15,8 @@ function _M.new(opts)
                           write_log = write_log, _test_inits = opts.test_inits,
                           processing=nil, count = 0,
                           count_fail=0, count_succ=0,
-                          mock_func = {}}, mt)
+                          mock_funs = {}
+                          }, mt)
 end
 
 -- 字颜色: 30--39
@@ -47,7 +46,6 @@ end
 
 function _M._log_standard_head( self )
   if not self.write_log then
-    return
   end
 
     local fun_format = self.unit_name
@@ -66,7 +64,19 @@ function _M.log( self, ... )
     return
   end
 
-  local log = {...}
+  local _log = {...}
+  local  log = {}
+  for k, v in pairs(_log) do
+    if type(v) == "table" then
+      table.insert(log, self.print_tb(v))
+    elseif type(v) == "string" then
+      table.insert(log, v)
+    else
+      table.insert(log, tostring(v))
+    end
+    _log = nil
+  end
+
   table.insert(log, "\n")
 
   self:_log_standard_head()
@@ -248,7 +258,8 @@ function _M.bench_run(self, total_count, micro_count, parallels)
     ngx.log(ngx.ERR, "bench all done")
 end
 
-
+-- object    org_name   new_fun     org_fun
+-- {redis_c, "get",     _redis_get  }
 function _M.mock_run(self, mock_rules, test_run, ...)
 
     local idx_tbl  = 1
@@ -266,7 +277,7 @@ function _M.mock_run(self, mock_rules, test_run, ...)
         rule[idx_tbl][fun_name] = new_fun
 
         -- store the orgnize function
-        self.mock_func[new_fun] = org_fun
+        self.mock_funs[new_fun] = org_fun
     end
 
     --exec test
@@ -292,5 +303,47 @@ local function my_clean(  )
     running = false
 end
 ngx.on_abort(my_clean)
+
+
+-- add print_tb
+function _M.print_tb(data)
+
+  local tb = ""
+
+  local function print_t(str)
+    if type(str) == "table" then
+        for k,v in pairs(str) do
+            if type(v) == "table" then
+                if type(k) == "string" then
+                    tb = tb .. k .. "={"
+                else
+                    tb = tb .. "{"
+                end
+                print_t(v)
+                tb = tb .. "},"
+            elseif type(v) == "string" then
+                if type(k) == "string" then
+                    tb = tb .. k .. "=" .. '\"'.. tostring(v) ..'\"'.. ","
+                else
+                    tb = tb .. '\"' .. tostring(v) .. '\"' .. ","
+                end
+            else
+                if type(k) == "string" then
+                    tb = tb .. k .. "=" .. tostring(v) .. ","
+                else
+                    tb = tb .. tostring(v) .. ","
+                end
+            end
+        end
+    end
+    tb = string.sub(tb, 0, string.len(tb) - 1)
+  end
+
+  tb = tb .. "{"
+  print_t(data)
+  tb = tb .. "}"
+
+  return tb
+end
 
 return _M
